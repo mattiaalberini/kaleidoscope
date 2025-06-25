@@ -1,12 +1,37 @@
-### Grammatica secondo livello 
+## Grammatica secondo livello 
 
-Aggiunti gli statements if e for
+Aggiunti gli statements ***if*** e ***for***
+
+```cpp
+class IfStmtAST : public StmtAST {
+  private:
+    ExprAST* Cond;
+    StmtAST* TrueExp;
+    StmtAST* FalseExp;
+  public:
+    IfStmtAST(ExprAST* Cond, StmtAST* TrueExp, StmtAST* FalseExp);
+    Value *codegen(driver& drv) override;
+};
+```
+
+```cpp
+class ForStmtAST : public StmtAST {
+  private: 
+    VarBindingAST* Init;
+    ExprAST* Cond;
+    VarBindingAST* Step;
+    StmtAST* Body;
+
+  public:
+    ForStmtAST(VarBindingAST* Init, ExprAST* Cond, VarBindingAST* Step, StmtAST* Body);
+    Value *codegen(driver& drv) override;
+};
+```
 
 
-### Grammatica terzo livello
+## Grammatica terzo livello
 
-Aggiunti gli operatori di algebra booleana AND, OR e NOT
-Per farlo ho aggiunto i token e ho modificato la classe BinaryExprAST:
+Aggiunti gli operatori di algebra booleana ***AND***, ***OR*** e ***NOT***. \
 
 ```cpp
   Value *BinaryExprAST::codegen(driver& drv) {
