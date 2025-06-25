@@ -177,7 +177,7 @@ public:
 };
 
 /// GlobalVariableAST - Classe per la rappresentazione di variabili globali
-class GlobalVariableAST: public StmtAST{
+class GlobalVariableAST: public RootAST{
   private:
     std::string Name;
 

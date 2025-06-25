@@ -289,51 +289,46 @@ const std::string& VarBindingAST::getName() const {
    return Name; 
 };
 
-/*
-  VarBindingAST gestisce contemporaneamente sia Definition che Assignment, per fare ciò effettua 
-  inizialmente un check per valutare se la variabile eseste già nello scope oppure no. E in seguito 
-  gestisce o la definizione creando l'area di memoria e allocando la variabile salvandola poi in NamedValue, 
-  oppure aggiorna la variabile già esistente con un operazione di store
-*/
+// Gestisce sia la definizione sia l'assegnamento
 Value* VarBindingAST::codegen(driver& drv) {
   AllocaInst *A = drv.NamedValues[Name];
+  // Controllo se la variabile esiste già
   if (!A) { 
     GlobalVariable* gv = module->getNamedGlobal(Name);
-    if(!gv){
-//////////////////////////////// VAR DEFINITION //////////////////////////////////
-        // Viene subito recuperato il riferimento alla funzione in cui si trova
-        // il blocco corrente. Il riferimento è necessario perché lo spazio necessario
-        // per memorizzare una variabile (ovunque essa sia definita, si tratti cioè
-        // di un parametro oppure di una variabile locale ad un blocco espressione)
-        // viene sempre riservato nell'entry block della funzione. Ricordiamo che
-        // l'allocazione viene fatta tramite l'utility CreateEntryBlockAlloca
+    // Controllo se è una variabile globale
+    if(!gv) {
+        // Definizione variabile
         Function *fun = builder->GetInsertBlock()->getParent();
-        // Ora viene generato il codice che definisce il valore della variabile
+        
+        // Genero il valore da assegnare
         Value *BoundVal = Val->codegen(drv);
-        if (!BoundVal)  // Qualcosa è andato storto nella generazione del codice?
+        if (!BoundVal)  
           return nullptr;
-        // Se tutto ok, si genera l'struzione che alloca memoria per la varibile ...
+
+        // Genero l'struzione che alloca memoria
         AllocaInst *Alloca = CreateEntryBlockAlloca(fun, Name);
-        // ... e si genera l'istruzione per memorizzarvi il valore dell'espressione,
-        // ovvero il contenuto del registro BoundVal
         builder->CreateStore(BoundVal, Alloca);
+
         drv.NamedValues[Name] = Alloca;
         return BoundVal;
-//////////////////////////////// VAR ASSIGNMENT //////////////////////////////////
-    }else {
+    } else {
+        // Assegno il valore alla variabli globale
+        // Genero il valore da assegnare
         Value *Boundval = Val->codegen(drv);
-        if (!Boundval)  // Qualcosa è andato storto nella generazione del codice?
+        if (!Boundval)
           return nullptr;   
         
         builder->CreateStore(Boundval, gv);
         return Boundval;}
-  }else {
-      Value *Bv = Val->codegen(drv);
-      if (!Bv)  // Qualcosa è andato storto nella generazione del codice?
+  } else {
+      // Assegno il valore alla variabli
+      // Genero il valore da assegnare
+      Value *Boundval = Val->codegen(drv);
+      if (!Boundval)
         return nullptr;
       
-      builder->CreateStore(Bv, A);
-      return Bv;
+      builder->CreateStore(Boundval, A);
+      return Boundval;
   }
 };
 
@@ -472,11 +467,13 @@ const std::string& GlobalVariableAST::getName() {
 };
 
 Value* GlobalVariableAST::codegen(driver& drv) {
-    // Creare la variabile globale in LLVM IR
-    GlobalVariable *gv = new GlobalVariable(*module, Type::getDoubleTy(*context), false, GlobalValue::CommonLinkage, ConstantFP::getNullValue(Type::getDoubleTy(*context)), Name);
-    //stampa della variabile globale su stderr per averla nel nostro file intermedio
+    // Creare la variabile globale 
+    GlobalVariable *gv = new GlobalVariable(*module, Type::getDoubleTy(*context), false, GlobalValue::WeakAnyLinkage, ConstantFP::getNullValue(Type::getDoubleTy(*context)), Name);
+    
+    //Stampo la variabile globale
     gv->print(llvm::errs());
     fprintf(stderr, "\n");
+
     return gv;
 }
 
@@ -484,9 +481,9 @@ Value* GlobalVariableAST::codegen(driver& drv) {
 
 /************************* Block **************************/
 /*
-  Sono presenti due costruttori per gestire le due possibilità della grammatica che permette di 
-  generare una serie di definizioni di variabili seguita da altri statemens, oppure direttamente
-  una sequenza di statemens
+  Due costruttori:
+    - Definizioni + statemens
+    - Solo statemens
 */
 BlockAST::BlockAST(std::vector<VarBindingAST*> Def, std::vector<StmtAST*> Stmts):
   Def(Def), Stmts(Stmts) {};
@@ -494,19 +491,14 @@ BlockAST::BlockAST(std::vector<VarBindingAST*> Def, std::vector<StmtAST*> Stmts)
 BlockAST::BlockAST(std::vector<StmtAST*> Stmts):
   Stmts(Stmts) {};
 
-/*
-  Nella generazione del codice vengono prima salvate le variabili eventualmente gia presenti nello scope
-  per evitare la perdita di dati che poi verranno ripristinati alla fine del blocco e si generano le 
-  eventuali def e stmts
-*/
+
 Value* BlockAST::codegen(driver& drv){
   // Salvo i valori della symbol table
   std::vector<AllocaInst*> tmp;
   for (int i=0; i<Def.size();i++ ){
-    //Salvo prima il vecchio valore se presente perchè altrimenti andremmo a perderlo durande il
-    // codegen della nuova definizione
+    // Salvo prima il vecchio valore se presente 
     tmp.push_back(drv.NamedValues[Def[i]->getName()]);
-
+    // Genero la nuova definizione
     Value *boundval = Def[i]->codegen(drv);
 
     if (!boundval) return nullptr;
@@ -514,11 +506,12 @@ Value* BlockAST::codegen(driver& drv){
 
   Value* laststmt;
   for(int i=0; i<Stmts.size(); i++){
+    // Genero gli statemens
     laststmt = Stmts[i]->codegen(drv);
     if(!laststmt) return nullptr;
   }
   
-  //Ripristino i valori nella symbol table
+  // Ripristino i valori nella symbol table
   for (int i=0; i<Def.size();i++ )
     drv.NamedValues[Def[i]->getName()] = tmp[i]; 
   
