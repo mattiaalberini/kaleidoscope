@@ -598,57 +598,50 @@ ForStmtAST::ForStmtAST(VarBindingAST* Init, ExprAST* Cond, VarBindingAST* Step, 
       : Init(Init), Cond(Cond), Step(Step), Body(Body) {};
 
 Value* ForStmtAST::codegen(driver& drv){
-  
-  Value *StartVal = Init->codegen(drv);
-  if (!StartVal)
-    return nullptr;
-    
-  // Make the new basic block for the loop header, inserting after current block.
+
   Function *function = builder->GetInsertBlock()->getParent();
-  BasicBlock *PreheaderBB = builder->GetInsertBlock();
+  BasicBlock *InitBB = BasicBlock::Create(*context, "init", function);
+  builder->CreateBr(InitBB);
+  // Creo i BB
+  BasicBlock *CondBB = BasicBlock::Create(*context, "cond", function);
   BasicBlock *LoopBB = BasicBlock::Create(*context, "loop", function);
+  BasicBlock *EndLoop = BasicBlock::Create(*context, "endloop", function);
 
-  // Insert an explicit fall through from the current block to the LoopBB.
-  builder->CreateBr(LoopBB);
-  
-  // Start insertion in LoopBB.
-  builder->SetInsertPoint(LoopBB);
-
-  // Start the PHI node with an entry for Start.
-  PHINode *Variable = builder->CreatePHI(Type::getDoubleTy(*context),
-                                        2, Init->getName());
-  Variable->addIncoming(StartVal, PreheaderBB);
-  
-
-  // Emit the body of the loop.  This, like any other expr, can change the
-  // current BB.  Note that we ignore the value computed by the body, but don't
-  // allow an error.
-  if (!Body->codegen(drv))
+  // Genero init (i=0)
+  builder->SetInsertPoint(InitBB);
+  Value *InitVal = Init->codegen(drv);
+  if (!InitVal)
     return nullptr;
- 
-  Value *genNext = Step->codegen(drv);
 
-    // Compute the end condition.
+  builder->CreateBr(CondBB);
+  builder->SetInsertPoint(CondBB);
+
+  // Genero la condizione di uscita dal loop
   Value *EndCond = Cond->codegen(drv);
   if (!EndCond)
     return nullptr;
-
-  // Convert condition to a bool by comparing non-equal to 0.0.
-    
-    // Create the "after loop" block and insert it.
-  BasicBlock *LoopEndBB = builder->GetInsertBlock();
-  BasicBlock *AfterBB = BasicBlock::Create(*context, "afterloop", function);
-
-  // Insert the conditional branch into the end of LoopEndBB.
-  builder->CreateCondBr(EndCond, LoopBB, AfterBB);
-
-  // Any new code will be inserted in AfterBB.
-  builder->SetInsertPoint(AfterBB);
-  // Add a new entry to the PHI node for the backedge.
-  Variable->addIncoming(genNext, LoopEndBB);
   
+  // Vado nel loop oppure esco
+  builder->CreateCondBr(EndCond, LoopBB, EndLoop);
+
+  // Genero il body
+  builder->SetInsertPoint(LoopBB);
+  Value *bodyVal = Body->codegen(drv);
+  if(!bodyVal) 
+    return nullptr;
+
+  // Step
+  Value* stepVal = Step->codegen(drv);
+  if(!stepVal) 
+    return nullptr;
+
+  // Salto al controllo di uscita
+  builder->CreateBr(CondBB);
+
+  // Fuori dal loop
+  builder->SetInsertPoint(EndLoop);
+
   drv.NamedValues.erase(Init->getName());
-  // for expr always returns 0.0.
-  //return Constant::getNullValue(Type::getDoubleTy(*context));
-  return Variable;
+
+  return ConstantFP::get(Type::getDoubleTy(*context), 0.0);
 }
