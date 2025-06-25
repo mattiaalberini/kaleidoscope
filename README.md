@@ -8,7 +8,7 @@ Aggiunti gli statements if e for
 Aggiunti gli operatori di algebra booleana AND, OR e NOT
 Per farlo ho aggiunto i token e ho modificato la classe BinaryExprAST:
 
-    
+'''    
 Value *BinaryExprAST::codegen(driver& drv) {
   if(Op == 'n') {
     //Not
@@ -44,3 +44,4 @@ Value *BinaryExprAST::codegen(driver& drv) {
     return LogErrorV("Operatore binario non supportato");
   }
 };
+'''
