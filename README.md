@@ -1,10 +1,13 @@
+### Grammatica secondo livello 
 
-## Grammatica terzo livello
+Aggiunti gli statements if e for
+
+
+### Grammatica terzo livello
 
 Aggiunti gli operatori di algebra booleana AND, OR e NOT
 Per farlo ho aggiunto i token e ho modificato la classe BinaryExprAST:
 
-''' c++
     
 Value *BinaryExprAST::codegen(driver& drv) {
   if(Op == 'n') {
@@ -41,5 +44,3 @@ Value *BinaryExprAST::codegen(driver& drv) {
     return LogErrorV("Operatore binario non supportato");
   }
 };
-
-'''
