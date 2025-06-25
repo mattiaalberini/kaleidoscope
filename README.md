@@ -1,6 +1,74 @@
+## Grammatica primo livello 
+
+Aggiunte le ***variabili globali***. Ho dovuto modificare anche la classe ***VariableExprAST***
+
+```cpp
+class GlobalVariableAST: public RootAST{
+  private:
+    std::string Name;
+
+  public:
+    GlobalVariableAST(const std::string Name);
+    Value* codegen(driver& drv) override;
+    const std::string& getName();
+};
+```
+
+```cpp
+Value *VariableExprAST::codegen(driver& drv) {
+  AllocaInst *A = drv.NamedValues[Name];
+  if (!A) {
+    GlobalVariable *gv = module->getNamedGlobal(Name);
+    if(!gv){
+      return LogErrorV("Variabile "+Name+" non definita");}
+    else{
+      return builder->CreateLoad(gv->getValueType(), gv, Name.c_str());}
+  }
+  return builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
+}
+```
+
+
+Aggiunta la classe virtuale ***StmtAST*** che rappresenta gli statements
+
+```cpp
+class StmtAST : public RootAST {};
+```
+
+
+Definita la classe virtuale ***BlockAST*** che rappresenta un blocco di codice
+
+```cpp
+class BlockAST : public ExprAST {
+  private:
+    std::vector<VarBindingAST*> Def;
+    std::vector<StmtAST*> Stmts;
+  public:
+  BlockAST(std::vector<VarBindingAST*> Def, std::vector<StmtAST*> Stmts);
+  BlockAST(std::vector<StmtAST*> Stmts);
+  Value *codegen(driver& drv) override;
+};
+```
+
+
+La classe ***VarBindingAST*** si occupa sia della definizione sia dell'assegnamento
+
+```cpp
+class VarBindingAST: public StmtAST {
+  private:
+    const std::string Name;
+    ExprAST* Val;
+  public:
+    VarBindingAST(const std::string Name, ExprAST* Val);
+    Value *codegen(driver& drv) override;
+    const std::string& getName() const;
+};
+```
+
+
 ## Grammatica secondo livello 
 
-Aggiunti gli statements ***if*** e ***for***
+Aggiunti gli statements ***if*** e ***for***.
 
 ```cpp
 class IfStmtAST : public StmtAST {
@@ -31,7 +99,7 @@ class ForStmtAST : public StmtAST {
 
 ## Grammatica terzo livello
 
-Aggiunti gli operatori di algebra booleana ***AND***, ***OR*** e ***NOT***. \
+Aggiunti gli operatori di algebra booleana ***AND***, ***OR*** e ***NOT***.
 
 ```cpp
   Value *BinaryExprAST::codegen(driver& drv) {
