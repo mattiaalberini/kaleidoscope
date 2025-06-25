@@ -202,10 +202,10 @@ class BlockAST : public ExprAST {
 class IfStmtAST : public StmtAST {
   private:
     ExprAST* Cond;
-    RootAST* TrueExp;
-    RootAST* FalseExp;
+    StmtAST* TrueExp;
+    StmtAST* FalseExp;
   public:
-    IfStmtAST(ExprAST* Cond, RootAST* TrueExp, RootAST* FalseExp);
+    IfStmtAST(ExprAST* Cond, StmtAST* TrueExp, StmtAST* FalseExp);
     Value *codegen(driver& drv) override;
 };
 

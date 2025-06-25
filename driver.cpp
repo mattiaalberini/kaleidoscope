@@ -528,59 +528,64 @@ Value* BlockAST::codegen(driver& drv){
 
 
 /************************* If Statement *************************/
-IfStmtAST::IfStmtAST(ExprAST* Cond, RootAST* TrueExp, RootAST* FalseExp):
+IfStmtAST::IfStmtAST(ExprAST* Cond, StmtAST* TrueExp, StmtAST* FalseExp):
    Cond(Cond), TrueExp(TrueExp), FalseExp(FalseExp) {};
 
-/*
-  Questa classe è locicamente identica alla classe IfExprAST, tranne per il fatto che un if block 
-  non lavora sono con semplici Expression ma blocchi di codice.
-*/   
 Value* IfStmtAST::codegen(driver& drv) {
-    // Viene dapprima generato il codice per valutare la condizione, che
-    // memorizza il risultato (di tipo i1, dunque booleano) nel registro SSA 
-    // che viene "memorizzato" in CondV. 
+    // Genero il codice per valutare la condizione
     Value* CondV = Cond->codegen(drv);
     if (!CondV)
        return nullptr;
-    
-    // Ora bisogna generare l'istruzione di salto condizionato, ma prima
-    // vanno creati i corrispondenti basic block nella funzione attuale
-    // (ovvero la funzione di cui fa parte il corrente blocco di inserimento)
+
+    // Recupero il riferimento alla funzione 
     Function *function = builder->GetInsertBlock()->getParent();
-    BasicBlock *TrueBB =  BasicBlock::Create(*context, "trueexp", function);
+
+    // Creo i basic block
     // Il blocco TrueBB viene inserito nella funzione dopo il blocco corrente
+    BasicBlock *TrueBB =  BasicBlock::Create(*context, "trueexp", function);
+
+    // Aspetto ad inserire gli altri due BB
     BasicBlock *FalseBB = BasicBlock::Create(*context, "falseexp");
     BasicBlock *MergeBB = BasicBlock::Create(*context, "endcond");
-    // Gli altri due blocchi non vengono ancora inseriti perché le istruzioni
-    // previste nel "ramo" true del condizionale potrebbe dare luogo alla creazione
-    // di altri blocchi, che naturalmente andrebbero inseriti prima di FalseBB
     
-    // Ora possiamo crere l'istruzione di salto condizionato
+    // Creo l'istruzione di salto condizionato
     builder->CreateCondBr(CondV, TrueBB, FalseBB);
     
+    // Specifico di inserire il codice nel TrueBB
     builder->SetInsertPoint(TrueBB);
+
+    // Genero il codice
     Value *TrueV = TrueExp->codegen(drv);
     if (!TrueV)
        return nullptr;
     builder->CreateBr(MergeBB);
     
+    // Recupero il TrueBB
     TrueBB = builder->GetInsertBlock();
+
+    // Il blocco FalseBB viene inserito alla fine della funzione
     function->insert(function->end(), FalseBB);
-    
+
+    // Specifico di inserire il codice nel FalseBB
     builder->SetInsertPoint(FalseBB);
     
+    // Genero il codice
     Value *FalseV = FalseExp->codegen(drv);
     if (!FalseV)
        return nullptr;
     builder->CreateBr(MergeBB);
     
+    // Recupero il FalseBB
     FalseBB = builder->GetInsertBlock();
+
+    // Il blocco MergeBB viene inserito alla fine della funzione
     function->insert(function->end(), MergeBB);
-    
     builder->SetInsertPoint(MergeBB);
   
-
     PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 2, "condval");
+
+    // Se viene TrueBB -> prende TrueV
+    // Se viene FalseBB -> prende FalseV
     PN->addIncoming(TrueV, TrueBB);
     PN->addIncoming(FalseV, FalseBB);
     return PN;
@@ -588,7 +593,7 @@ Value* IfStmtAST::codegen(driver& drv) {
 
 
 
-// *********************** FOR-STATEMENT AST ****************************
+// *********************** For Statement ****************************
 ForStmtAST::ForStmtAST(VarBindingAST* Init, ExprAST* Cond, VarBindingAST* Step, StmtAST* Body)
       : Init(Init), Cond(Cond), Step(Step), Body(Body) {};
 
